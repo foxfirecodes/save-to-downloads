@@ -3,8 +3,14 @@ set -euo pipefail
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/sdk}}
-platform=$(find "$sdk/platforms" -mindepth 2 -maxdepth 2 -name android.jar | sort -V | tail -n 1)
-build_tools=$(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+platform="$sdk/platforms/android-36/android.jar"
+build_tools="$sdk/build-tools/36.0.0"
+if [[ ! -f "$platform" ]]; then
+    platform=$(find "$sdk/platforms" -mindepth 2 -maxdepth 2 -name android.jar | sort -V | tail -n 1)
+fi
+if [[ ! -x "$build_tools/aapt2" ]]; then
+    build_tools=$(find "$sdk/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+fi
 if [[ -z "$platform" || -z "$build_tools" ]]; then
     echo "Install an Android SDK platform and build tools, then set ANDROID_HOME." >&2
     exit 1
@@ -17,7 +23,8 @@ mkdir -p "$work/classes" "$work/generated" "$work/dex"
 
 "$build_tools/aapt2" compile --dir "$root/src/main/res" -o "$work/resources.zip"
 "$build_tools/aapt2" link -I "$platform" --manifest "$root/src/main/AndroidManifest.xml" \
-    --min-sdk-version 29 --target-sdk-version 36 --version-code 1 --version-name 1.0 \
+    --min-sdk-version 29 --target-sdk-version 36 \
+    --version-code "${APK_VERSION_CODE:-1}" --version-name "${APK_VERSION_NAME:-1.0}" \
     --java "$work/generated" -o "$work/unsigned.apk" "$work/resources.zip"
 
 mapfile -d '' sources < <(find "$root/src/main/java" "$work/generated" -name '*.java' -print0)
