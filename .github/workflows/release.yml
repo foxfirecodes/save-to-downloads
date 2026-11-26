@@ -1,0 +1,62 @@
+name: Release APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: New Git tag (for example, v1.0.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag }}
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag
+        shell: bash
+        run: git check-ref-format "refs/tags/$RELEASE_TAG"
+
+      - name: Build release APK
+        env:
+          APK_SIGNING_KEYSTORE: ${{ secrets.APK_SIGNING_KEYSTORE }}
+        shell: bash
+        run: |
+          : "${APK_SIGNING_KEYSTORE:?Set the APK_SIGNING_KEYSTORE Actions secret}"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/release-signing"
+          install -d -m 700 "$ANDROID_USER_HOME"
+          trap 'rm -f -- "$ANDROID_USER_HOME/debug.keystore"' EXIT
+          umask 077
+          printf '%s' "$APK_SIGNING_KEYSTORE" | base64 --decode > "$ANDROID_USER_HOME/debug.keystore"
+          unset APK_SIGNING_KEYSTORE
+
+          export JAVA_HOME="$JAVA_HOME_21_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          export APK_VERSION_NAME="$RELEASE_TAG"
+          export APK_VERSION_CODE="$((GITHUB_RUN_NUMBER + 1))"
+          ./build.sh
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          existing_tag=$(git ls-remote --refs origin "refs/tags/$RELEASE_TAG")
+          if [[ -n "$existing_tag" ]]; then
+              echo "Tag already exists: $RELEASE_TAG" >&2
+              exit 1
+          fi
+          gh release create --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes \
+              -- "$RELEASE_TAG" build/save-to-downloads.apk
