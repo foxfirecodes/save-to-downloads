@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Save to Downloads</string>
+    <string name="saving">Saving to Downloads…</string>
+    <string name="no_files">No files were shared</string>
+    <string name="interrupted">Saving was interrupted</string>
+    <string name="save_failed">Couldn’t save to Downloads</string>
+    <string name="saved_some">Saved %1$d of %2$d files to Downloads</string>
+    <plurals name="saved_files">
+        <item quantity="one">Saved to Downloads</item>
+        <item quantity="other">Saved %d files to Downloads</item>
+    </plurals>
+</resources>
