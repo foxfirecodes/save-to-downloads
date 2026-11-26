@@ -1,0 +1,45 @@
+[tools]
+java = "temurin-21"
+yq = "4"
+android-sdk = "21.0"
+
+[tasks.sdk]
+description = "Install Android SDK packages for the build"
+raw = true
+run = '''
+if [ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" ] ||
+   [ ! -x "$ANDROID_HOME/build-tools/36.0.0/aapt2" ] ||
+   [ ! -x "$ANDROID_HOME/platform-tools/adb" ]; then
+    sdkmanager --sdk_root="$ANDROID_HOME" "platforms;android-36" "build-tools;36.0.0" platform-tools
+fi
+'''
+
+[tasks.build]
+description = "Build and sign the APK"
+depends = ["sdk"]
+run = "./build.sh"
+
+[tasks."emulator:setup"]
+description = "Install an Android 16 image and create the SaveToDownloads emulator"
+depends = ["sdk"]
+raw = true
+run = '''
+case "$(uname -m)" in
+    x86_64) abi=x86_64 ;;
+    arm64|aarch64) abi=arm64-v8a ;;
+    *) echo "Unsupported emulator host architecture" >&2; exit 1 ;;
+esac
+
+image="system-images;android-36;google_apis;$abi"
+emulator="$ANDROID_HOME/emulator/emulator"
+if [ ! -x "$emulator" ] || [ ! -f "$ANDROID_HOME/system-images/android-36/google_apis/$abi/system.img" ]; then
+    sdkmanager --sdk_root="$ANDROID_HOME" emulator "$image"
+fi
+if ! "$emulator" -list-avds | grep -Fxq SaveToDownloads; then
+    printf 'no\n' | avdmanager create avd --name SaveToDownloads --package "$image"
+fi
+'''
+
+[tasks.emulator]
+description = "Start the SaveToDownloads emulator"
+run = '"$ANDROID_HOME/emulator/emulator" -avd SaveToDownloads'
